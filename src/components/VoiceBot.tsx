@@ -249,7 +249,7 @@ export default function VoiceBot() {
   const [vapiPublicKey, setVapiPublicKey] = useState<string>("");
   const [keyMessage, setKeyMessage] = useState<string | null>(null);
 
-  const vapiRef = useRef<Vapi | null>(null);
+  const [vapi, setVapi] = useState<Vapi | null>(null);
   const transcriptRef = useRef<TranscriptMessage[]>([]);
   const personaAtCallStart = useRef<Persona>(selectedPersona);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -260,9 +260,7 @@ export default function VoiceBot() {
     const initialKey = storedKey || process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
     if (initialKey) {
       setVapiPublicKey(initialKey);
-      if (!vapiRef.current) {
-        vapiRef.current = new Vapi(initialKey);
-      }
+      setVapi((prev) => prev || new Vapi(initialKey));
     }
   }, []);
 
@@ -270,45 +268,53 @@ export default function VoiceBot() {
     if (!vapiPublicKey) return;
     localStorage.setItem("VAPI_PUBLIC_KEY", vapiPublicKey);
     
-    if (vapiRef.current) {
-      vapiRef.current.stop();
-      vapiRef.current.removeAllListeners();
+    if (vapi) {
+      vapi.stop();
+      vapi.removeAllListeners();
     }
-    vapiRef.current = new Vapi(vapiPublicKey);
+    const newVapiInstance = new Vapi(vapiPublicKey);
+    setVapi(newVapiInstance);
     
     setKeyMessage("Vapi Key saved successfully!");
     setTimeout(() => setKeyMessage(null), 3000);
-  }, [vapiPublicKey]);
+  }, [vapiPublicKey, vapi]);
 
   const clearKey = useCallback(() => {
     localStorage.removeItem("VAPI_PUBLIC_KEY");
     setVapiPublicKey("");
-    if (vapiRef.current) {
-      vapiRef.current.stop();
-      vapiRef.current.removeAllListeners();
-      vapiRef.current = null;
+    if (vapi) {
+      vapi.stop();
+      vapi.removeAllListeners();
     }
-  }, []);
+    setVapi(null);
+  }, [vapi]);
 
   const cleanup = useCallback(() => {
-    if (vapiRef.current) {
-      vapiRef.current.stop();
-      vapiRef.current.removeAllListeners();
-      vapiRef.current = null;
+    if (vapi) {
+      vapi.stop();
+      vapi.removeAllListeners();
     }
-  }, []);
+  }, [vapi]);
 
   useEffect(() => cleanup, [cleanup]);
 
   const startCall = useCallback(async () => {
-    if (!vapiRef.current || !vapiPublicKey) {
+    const savedKey = vapiPublicKey || localStorage.getItem("VAPI_PUBLIC_KEY");
+    let activeVapi = vapi;
+    
+    if (!activeVapi && savedKey) {
+      activeVapi = new Vapi(savedKey);
+      setVapi(activeVapi);
+    }
+
+    if (!activeVapi || !savedKey) {
       setCallStatus("error");
       setErrorMessage("Please enter and save your Vapi Public Key first.");
       return;
     }
 
-    vapiRef.current.stop();
-    vapiRef.current.removeAllListeners();
+    activeVapi.stop();
+    activeVapi.removeAllListeners();
 
     setCallStatus("connecting");
     setErrorMessage(null);
@@ -317,22 +323,23 @@ export default function VoiceBot() {
     transcriptRef.current = [];
     personaAtCallStart.current = selectedPersona;
 
-    const vapi = vapiRef.current;
+    activeVapi.on("call-start", () => setCallStatus("connected"));
 
-    vapi.on("call-start", () => setCallStatus("connected"));
-
-    vapi.on("call-end", () => {
+    activeVapi.on("call-end", () => {
       const result = analyseTranscript(transcriptRef.current, personaAtCallStart.current);
       setEvaluation(result);
       setCallStatus("idle");
       setIsMuted(false);
-      cleanup();
+      if (activeVapi) {
+        activeVapi.stop();
+        activeVapi.removeAllListeners();
+      }
     });
 
-    vapi.on("speech-start", () => setCallStatus("speaking"));
-    vapi.on("speech-end", () => setCallStatus("connected"));
+    activeVapi.on("speech-start", () => setCallStatus("speaking"));
+    activeVapi.on("speech-end", () => setCallStatus("connected"));
 
-    vapi.on("error", (err) => {
+    activeVapi.on("error", (err) => {
       const message = typeof err === "string" ? err : (err as Error)?.message ?? "";
       // "Meeting has ended" is fired by Daily.co during normal call teardown — not a real error
       if (message.toLowerCase().includes("meeting has ended")) {
@@ -344,7 +351,7 @@ export default function VoiceBot() {
       setErrorMessage(message || "An error occurred with the voice session.");
     });
 
-    vapi.on("message", (msg: Record<string, unknown>) => {
+    activeVapi.on("message", (msg: Record<string, unknown>) => {
       if (msg.type === "transcript") {
         console.log("[Vapi Transcript Event]", msg);
       }
@@ -388,7 +395,7 @@ export default function VoiceBot() {
     ].join("\n");
 
     try {
-      await vapi.start({
+      await activeVapi.start({
         model: {
           provider: "openai",
           model: "gpt-4o-mini",
@@ -408,16 +415,16 @@ export default function VoiceBot() {
       setCallStatus("error");
       setErrorMessage(err instanceof Error ? err.message : "Failed to start voice call.");
     }
-  }, [selectedPersona, cleanup]);
+  }, [vapi, vapiPublicKey, selectedPersona]);
 
   const endCall = useCallback(() => {
-    if (vapiRef.current) {
-      vapiRef.current.stop();
+    if (vapi) {
+      vapi.stop();
     } else {
       setCallStatus("idle");
       setIsMuted(false);
     }
-  }, []);
+  }, [vapi]);
 
   const resetEvaluation = useCallback(() => {
     setEvaluation(null);
@@ -425,12 +432,12 @@ export default function VoiceBot() {
   }, []);
 
   const toggleMute = useCallback(() => {
-    if (vapiRef.current) {
+    if (vapi) {
       const next = !isMuted;
-      vapiRef.current.setMuted(next);
+      vapi.setMuted(next);
       setIsMuted(next);
     }
-  }, [isMuted]);
+  }, [isMuted, vapi]);
 
   const isActive = callStatus === "connected" || callStatus === "speaking";
 
