@@ -264,6 +264,7 @@ export default function VoiceBot() {
 
   const startCall = useCallback(async () => {
     const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
+    console.log("Loaded Vapi Key:", publicKey);
     if (!publicKey) {
       setCallStatus("error");
       setErrorMessage("Missing NEXT_PUBLIC_VAPI_PUBLIC_KEY in environment variables.");
@@ -296,12 +297,22 @@ export default function VoiceBot() {
     vapi.on("speech-end", () => setCallStatus("connected"));
 
     vapi.on("error", (err) => {
+      const message = typeof err === "string" ? err : (err as Error)?.message ?? "";
+      // "Meeting has ended" is fired by Daily.co during normal call teardown — not a real error
+      if (message.toLowerCase().includes("meeting has ended")) {
+        console.info("[Vapi] Call teardown complete (Meeting has ended — expected).");
+        return;
+      }
       console.error("[Vapi Error]", err);
       setCallStatus("error");
-      setErrorMessage(typeof err === "string" ? err : (err as Error)?.message ?? "An error occurred with the voice session.");
+      setErrorMessage(message || "An error occurred with the voice session.");
     });
 
     vapi.on("message", (msg: Record<string, unknown>) => {
+      if (msg.type === "transcript") {
+        console.log("[Vapi Transcript Event]", msg);
+      }
+
       if (
         msg.type === "transcript" &&
         typeof msg.transcript === "string" &&
@@ -347,8 +358,14 @@ export default function VoiceBot() {
           model: "gpt-4o-mini",
           messages: [{ role: "system", content: systemPrompt }],
         },
+        transcriber: {
+          provider: "deepgram",
+          model: "nova-2",
+          language: "en",
+          endpointing: 300,
+        },
         name: `${selectedPersona.name} – ${selectedPersona.role}`,
-        firstMessage: `Hi there! I'm ${selectedPersona.name}, ${selectedPersona.role} at a ${selectedPersona.industry}. What have you got for me today?`,
+        firstMessage: `Hello, this is ${selectedPersona.name}.`,
       });
     } catch (err) {
       console.error("[Vapi Start Error]", err);
