@@ -246,11 +246,26 @@ export default function VoiceBot() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [liveTranscript, setLiveTranscript] = useState<LiveMessage[]>([]);
+  const [vapiPublicKey, setVapiPublicKey] = useState<string>("");
 
   const vapiRef = useRef<Vapi | null>(null);
   const transcriptRef = useRef<TranscriptMessage[]>([]);
   const personaAtCallStart = useRef<Persona>(selectedPersona);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load Vapi key from localStorage or fallback to env var
+    const storedKey = localStorage.getItem("VAPI_PUBLIC_KEY");
+    if (storedKey) {
+      setVapiPublicKey(storedKey);
+    } else if (process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY) {
+      setVapiPublicKey(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
+    }
+  }, []);
+
+  const saveKey = useCallback(() => {
+    localStorage.setItem("VAPI_PUBLIC_KEY", vapiPublicKey);
+  }, [vapiPublicKey]);
 
   const cleanup = useCallback(() => {
     if (vapiRef.current) {
@@ -263,11 +278,9 @@ export default function VoiceBot() {
   useEffect(() => cleanup, [cleanup]);
 
   const startCall = useCallback(async () => {
-    const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
-    console.log("Loaded Vapi Key:", publicKey);
-    if (!publicKey) {
+    if (!vapiPublicKey) {
       setCallStatus("error");
-      setErrorMessage("Missing NEXT_PUBLIC_VAPI_PUBLIC_KEY in environment variables.");
+      setErrorMessage("Please enter your Vapi Public Key above to start a call.");
       return;
     }
 
@@ -280,7 +293,7 @@ export default function VoiceBot() {
     transcriptRef.current = [];
     personaAtCallStart.current = selectedPersona;
 
-    const vapi = new Vapi(publicKey);
+    const vapi = new Vapi(vapiPublicKey);
     vapiRef.current = vapi;
 
     vapi.on("call-start", () => setCallStatus("connected"));
@@ -407,6 +420,32 @@ export default function VoiceBot() {
 
   return (
     <div className="flex flex-col gap-10 w-full font-sans">
+
+      {/* ── API Key Configuration ────────────────────────────────────────── */}
+      <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-5 shadow-lg">
+        <label className="block text-xs font-mono uppercase tracking-widest text-zinc-400 mb-3">
+          Vapi Configuration
+        </label>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="password"
+            value={vapiPublicKey}
+            onChange={(e) => setVapiPublicKey(e.target.value)}
+            placeholder="Enter VAPI Public Key"
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-colors font-mono"
+            autoComplete="off"
+          />
+          <button
+            onClick={saveKey}
+            className="whitespace-nowrap px-6 py-2.5 bg-white text-black font-semibold text-sm rounded-lg hover:bg-zinc-200 transition-colors"
+          >
+            Save Key
+          </button>
+        </div>
+        <p className="text-zinc-500 text-[11px] mt-2 font-mono">
+          Saved to localStorage. Get your key from the Vapi Dashboard.
+        </p>
+      </section>
 
       {/* ── Persona Cards (Ordered Easy -> Medium -> Hard) ──────────────── */}
       <section>

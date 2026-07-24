@@ -12,7 +12,7 @@ export default function Home() {
           Master the Sales Pitch.
         </h1>
         <p className="text-zinc-400 text-base md:text-lg max-w-2xl mx-auto font-light leading-relaxed">
-          Select a customer persona, practice handling real-time objections over live audio, and receive an instant AI evaluation of your call transcript.
+          Select a customer persona, practice handling real-time objections over live audio, and receive an instant AI evaluation of your call transcript using VAPI api
         </p>
       </header>
 
