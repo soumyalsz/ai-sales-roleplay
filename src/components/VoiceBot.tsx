@@ -247,6 +247,7 @@ export default function VoiceBot() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [liveTranscript, setLiveTranscript] = useState<LiveMessage[]>([]);
   const [vapiPublicKey, setVapiPublicKey] = useState<string>("");
+  const [keyMessage, setKeyMessage] = useState<string | null>(null);
 
   const vapiRef = useRef<Vapi | null>(null);
   const transcriptRef = useRef<TranscriptMessage[]>([]);
@@ -256,20 +257,37 @@ export default function VoiceBot() {
   useEffect(() => {
     // Load Vapi key from localStorage or fallback to env var
     const storedKey = localStorage.getItem("VAPI_PUBLIC_KEY");
-    if (storedKey) {
-      setVapiPublicKey(storedKey);
-    } else if (process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY) {
-      setVapiPublicKey(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
+    const initialKey = storedKey || process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
+    if (initialKey) {
+      setVapiPublicKey(initialKey);
+      if (!vapiRef.current) {
+        vapiRef.current = new Vapi(initialKey);
+      }
     }
   }, []);
 
   const saveKey = useCallback(() => {
+    if (!vapiPublicKey) return;
     localStorage.setItem("VAPI_PUBLIC_KEY", vapiPublicKey);
+    
+    if (vapiRef.current) {
+      vapiRef.current.stop();
+      vapiRef.current.removeAllListeners();
+    }
+    vapiRef.current = new Vapi(vapiPublicKey);
+    
+    setKeyMessage("Vapi Key saved successfully!");
+    setTimeout(() => setKeyMessage(null), 3000);
   }, [vapiPublicKey]);
 
   const clearKey = useCallback(() => {
     localStorage.removeItem("VAPI_PUBLIC_KEY");
     setVapiPublicKey("");
+    if (vapiRef.current) {
+      vapiRef.current.stop();
+      vapiRef.current.removeAllListeners();
+      vapiRef.current = null;
+    }
   }, []);
 
   const cleanup = useCallback(() => {
@@ -283,13 +301,14 @@ export default function VoiceBot() {
   useEffect(() => cleanup, [cleanup]);
 
   const startCall = useCallback(async () => {
-    if (!vapiPublicKey) {
+    if (!vapiRef.current || !vapiPublicKey) {
       setCallStatus("error");
-      setErrorMessage("Vapi Public Key is required to start a call.");
+      setErrorMessage("Please enter and save your Vapi Public Key first.");
       return;
     }
 
-    cleanup();
+    vapiRef.current.stop();
+    vapiRef.current.removeAllListeners();
 
     setCallStatus("connecting");
     setErrorMessage(null);
@@ -298,8 +317,7 @@ export default function VoiceBot() {
     transcriptRef.current = [];
     personaAtCallStart.current = selectedPersona;
 
-    const vapi = new Vapi(vapiPublicKey);
-    vapiRef.current = vapi;
+    const vapi = vapiRef.current;
 
     vapi.on("call-start", () => setCallStatus("connected"));
 
@@ -459,6 +477,13 @@ export default function VoiceBot() {
             Clear Key
           </button>
         </div>
+        
+        {keyMessage && (
+          <p className="text-emerald-400 text-sm mt-3 font-medium animate-pulse">
+            ✓ {keyMessage}
+          </p>
+        )}
+        
         <p className="text-zinc-500 text-[11px] mt-2 font-mono">
           Saved to localStorage. Get your key from the Vapi Dashboard.
         </p>
