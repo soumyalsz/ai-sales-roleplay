@@ -267,6 +267,11 @@ export default function VoiceBot() {
     localStorage.setItem("VAPI_PUBLIC_KEY", vapiPublicKey);
   }, [vapiPublicKey]);
 
+  const clearKey = useCallback(() => {
+    localStorage.removeItem("VAPI_PUBLIC_KEY");
+    setVapiPublicKey("");
+  }, []);
+
   const cleanup = useCallback(() => {
     if (vapiRef.current) {
       vapiRef.current.stop();
@@ -280,7 +285,7 @@ export default function VoiceBot() {
   const startCall = useCallback(async () => {
     if (!vapiPublicKey) {
       setCallStatus("error");
-      setErrorMessage("Please enter your Vapi Public Key above to start a call.");
+      setErrorMessage("Vapi Public Key is required to start a call.");
       return;
     }
 
@@ -430,7 +435,13 @@ export default function VoiceBot() {
           <input
             type="password"
             value={vapiPublicKey}
-            onChange={(e) => setVapiPublicKey(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setVapiPublicKey(val);
+              if (!val) {
+                localStorage.removeItem("VAPI_PUBLIC_KEY");
+              }
+            }}
             placeholder="Enter VAPI Public Key"
             className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-colors font-mono"
             autoComplete="off"
@@ -440,6 +451,12 @@ export default function VoiceBot() {
             className="whitespace-nowrap px-6 py-2.5 bg-white text-black font-semibold text-sm rounded-lg hover:bg-zinc-200 transition-colors"
           >
             Save Key
+          </button>
+          <button
+            onClick={clearKey}
+            className="whitespace-nowrap px-6 py-2.5 bg-zinc-900 border border-zinc-700 text-zinc-300 font-semibold text-sm rounded-lg hover:bg-zinc-800 hover:text-white transition-colors"
+          >
+            Clear Key
           </button>
         </div>
         <p className="text-zinc-500 text-[11px] mt-2 font-mono">
