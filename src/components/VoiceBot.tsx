@@ -249,13 +249,7 @@ export default function VoiceBot() {
   const [vapiPublicKey, setVapiPublicKey] = useState<string>("");
   const [keyMessage, setKeyMessage] = useState<string | null>(null);
 
-  const [vapi, setVapi] = useState<Vapi | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
-  const selectedPersonaRef = useRef<Persona>(selectedPersona);
-
-  useEffect(() => {
-    selectedPersonaRef.current = selectedPersona;
-  }, [selectedPersona]);
   const transcriptRef = useRef<TranscriptMessage[]>([]);
   const personaAtCallStart = useRef<Persona>(selectedPersona);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -267,9 +261,7 @@ export default function VoiceBot() {
     if (initialKey) {
       setVapiPublicKey(initialKey);
       if (!vapiRef.current) {
-        const newVapi = new Vapi(initialKey);
-        vapiRef.current = newVapi;
-        setVapi(newVapi);
+        vapiRef.current = new Vapi(initialKey);
       }
     }
   }, []);
@@ -282,9 +274,7 @@ export default function VoiceBot() {
       vapiRef.current.stop();
       vapiRef.current.removeAllListeners();
     }
-    const newVapiInstance = new Vapi(vapiPublicKey);
-    vapiRef.current = newVapiInstance;
-    setVapi(newVapiInstance);
+    vapiRef.current = new Vapi(vapiPublicKey);
     
     setKeyMessage("Vapi Key saved successfully!");
     setTimeout(() => setKeyMessage(null), 3000);
@@ -298,7 +288,6 @@ export default function VoiceBot() {
       vapiRef.current.removeAllListeners();
       vapiRef.current = null;
     }
-    setVapi(null);
   }, []);
 
   const cleanup = useCallback(() => {
@@ -313,20 +302,18 @@ export default function VoiceBot() {
 
   const startCall = useCallback(async () => {
     const savedKey = localStorage.getItem("VAPI_PUBLIC_KEY") || vapiPublicKey;
-    let activeVapi = vapiRef.current;
     
-    if (!activeVapi && savedKey) {
-      activeVapi = new Vapi(savedKey);
-      vapiRef.current = activeVapi;
-      setVapi(activeVapi);
+    if (!vapiRef.current && savedKey) {
+      vapiRef.current = new Vapi(savedKey);
     }
 
-    if (!activeVapi || !savedKey) {
+    if (!vapiRef.current || !savedKey) {
       setCallStatus("error");
       setErrorMessage("Please enter and save your Vapi Public Key first.");
       return;
     }
 
+    const activeVapi = vapiRef.current;
     activeVapi.stop();
     activeVapi.removeAllListeners();
 
@@ -336,8 +323,7 @@ export default function VoiceBot() {
     setLiveTranscript([]);
     transcriptRef.current = [];
     
-    const currentPersona = selectedPersonaRef.current;
-    personaAtCallStart.current = currentPersona;
+    personaAtCallStart.current = selectedPersona;
 
     activeVapi.on("call-start", () => setCallStatus("connected"));
 
@@ -404,10 +390,10 @@ export default function VoiceBot() {
     });
 
     const systemPrompt = [
-      currentPersona.systemPromptInstructions,
-      `\nYour name is ${currentPersona.name}. Your role is ${currentPersona.role} at a ${currentPersona.industry}.`,
-      `Your tone is: ${currentPersona.tone}.`,
-      `Key objections you should raise:\n${currentPersona.keyObjections.map((o) => `- ${o}`).join("\n")}`,
+      selectedPersona.systemPromptInstructions,
+      `\nYour name is ${selectedPersona.name}. Your role is ${selectedPersona.role} at a ${selectedPersona.industry}.`,
+      `Your tone is: ${selectedPersona.tone}.`,
+      `Key objections you should raise:\n${selectedPersona.keyObjections.map((o) => `- ${o}`).join("\n")}`,
     ].join("\n");
 
     try {
@@ -423,15 +409,15 @@ export default function VoiceBot() {
           language: "en",
           endpointing: 300,
         },
-        name: `${currentPersona.name} – ${currentPersona.role}`,
-        firstMessage: `Hello, this is ${currentPersona.name}.`,
+        name: `${selectedPersona.name} – ${selectedPersona.role}`,
+        firstMessage: `Hello, this is ${selectedPersona.name}.`,
       });
     } catch (err) {
       console.error("[Vapi Start Error]", err);
       setCallStatus("error");
       setErrorMessage(err instanceof Error ? err.message : "Failed to start voice call.");
     }
-  }, [vapiPublicKey]); // No longer depends on selectedPersona or vapi due to refs
+  }, [vapiPublicKey, selectedPersona]);
 
   const endCall = useCallback(() => {
     if (vapiRef.current) {
