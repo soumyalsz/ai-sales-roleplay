@@ -6,13 +6,13 @@ A real-time voice bot that roleplays as a customer so sales reps can practice pi
 
 ## Live Demo
 
-**[Try the Live Web App](https://ai-sales-roleplay-6m54vbhxr-excape.vercel.app/)**
+**[Try the Live Web App](https://ai-sales-roleplay-one.vercel.app/)**
 
 ---
 
 ## How to Use the Website
 
-1. **Open the App:** Visit the [Live Vercel Link](https://ai-sales-roleplay-6m54vbhxr-excape.vercel.app/).
+1. **Open the App:** Visit the [Live Vercel Link](https://ai-sales-roleplay-one.vercel.app/).
 2. **Enter Your Vapi Key:** Paste your Vapi Public Key into the BYOK (Bring Your Own Key) text box and click **Save Key**.
 3. **Select a Persona:** Choose a customer profile from the dropdown (e.g., *Dimitri Ivanov* for Easy Mode or *Kushagra* for VP of Engineering Hard Mode).
 4. **Start the Call:** Click **Start Call** and grant microphone permissions when prompted.
